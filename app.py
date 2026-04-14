@@ -1,31 +1,15 @@
 import os
+import requests
 from flask import Flask
 from ask_sdk_core.skill_builder import SkillBuilder
-from flask_ask_sdk.skill_adapter import SkillAdapter
 from ask_sdk_core.dispatch_components import AbstractRequestHandler
 from ask_sdk_core.utils import is_request_type, is_intent_name
-import requests
-import threading
-from adb_shell.adb_device import AdbDeviceTcp
-from adb_shell.auth.sign_pythonrsa import PythonRSASigner
+from flask_ask_sdk.skill_adapter import SkillAdapter
 
 app = Flask(__name__)
 sb = SkillBuilder()
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-FIRESTICK_IP = '192.168.12.187'
-
-def firestick_command(cmd):
-    def run():
-        try:
-            signer = PythonRSASigner.FromRSAKeyPath('C:\\Users\\Admin\\.adb_key')
-            device = AdbDeviceTcp(FIRESTICK_IP, 5555)
-            device.connect(rsa_keys=[signer])
-            device.shell(cmd)
-            device.close()
-        except:
-            pass
-    threading.Thread(target=run).start()
 
 class LaunchHandler(AbstractRequestHandler):
     def can_handle(self, handler_input):
@@ -42,40 +26,21 @@ class AskIntentHandler(AbstractRequestHandler):
         slots = handler_input.request_envelope.request.intent.slots
         user_input = slots.get("query").value if slots.get("query") else "hello"
 
-        if 'turn on' in user_input.lower() or 'wake' in user_input.lower():
-            firestick_command('input keyevent KEYCODE_WAKEUP')
-            speech = "Turning on the TV."
-        elif 'turn off' in user_input.lower():
-            firestick_command('input keyevent KEYCODE_SLEEP')
-            speech = "Turning off the TV."
-        elif 'netflix' in user_input.lower():
-            firestick_command('am start -n com.netflix.ninja/.MainActivity')
-            speech = "Opening Netflix."
-        elif 'pause' in user_input.lower():
-            firestick_command('input keyevent KEYCODE_MEDIA_PAUSE')
-            speech = "Paused."
-        elif 'volume up' in user_input.lower():
-            firestick_command('input keyevent KEYCODE_VOLUME_UP')
-            speech = "Volume up."
-        elif 'volume down' in user_input.lower():
-            firestick_command('input keyevent KEYCODE_VOLUME_DOWN')
-            speech = "Volume down."
-        else:
-            response = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {GROQ_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [
-                        {"role": "system", "content": "You are Jarvis, a helpful AI assistant. Keep all responses under 40 words."},
-                        {"role": "user", "content": user_input}
-                    ]
-                }
-            )
-            speech = response.json()['choices'][0]['message']['content']
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": "You are Jarvis, a helpful AI assistant. Keep all responses under 40 words."},
+                    {"role": "user", "content": user_input}
+                ]
+            }
+        )
+        speech = response.json()['choices'][0]['message']['content']
 
         return handler_input.response_builder.speak(speech).response
 
