@@ -1,7 +1,5 @@
 flask
 requests
 flask-ask-sdk
-ask-sdk
-adb-shell
-androidtv
+ask-sdk-core
 gunicorn
